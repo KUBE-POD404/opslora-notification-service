@@ -2,18 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: notification-deployment
-  namespace: sales-test-ns
+  namespace: opslora-test-ns
   labels:
     app: notification
 
 spec:
   replicas: 2
-
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
 
   selector:
     matchLabels:
@@ -25,8 +19,6 @@ spec:
         app: notification-microservice
 
     spec:
-      serviceAccountName: notification-sa
-
       containers:
         - name: notification-container
           image: kubectlandchill/sales-notification-service:v1.0.1
@@ -52,6 +44,20 @@ spec:
               memory: "512Mi"
               ephemeral-storage: "500Mi"
 
+          readinessProbe:
+            httpGet:
+              path: /api/notification/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /api/notification/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -72,3 +78,9 @@ spec:
                     values:
                       - notification-microservice
               topologyKey: "kubernetes.io/hostname"
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
