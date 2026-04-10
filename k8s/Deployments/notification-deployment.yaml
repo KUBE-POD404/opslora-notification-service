@@ -37,14 +37,16 @@ spec:
               topologyKey: "kubernetes.io/hostname"
 
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app
-                    operator: In
-                    values:
-                      - notification-microservice
-              topologyKey: "kubernetes.io/hostname"
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - notification-microservice
+                topologyKey: "kubernetes.io/hostname"
 
       containers:
         - name: notification-container
