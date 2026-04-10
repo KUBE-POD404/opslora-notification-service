@@ -13,12 +13,39 @@ spec:
     matchLabels:
       app: notification-microservice
 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+
   template:
     metadata:
       labels:
         app: notification-microservice
 
     spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - rabbitmq
+              topologyKey: "kubernetes.io/hostname"
+
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - notification-microservice
+              topologyKey: "kubernetes.io/hostname"
+
       containers:
         - name: notification-container
           image: kubectlandchill/sales-notification-service:v1.0.1
@@ -44,6 +71,7 @@ spec:
               memory: "512Mi"
               ephemeral-storage: "500Mi"
 
+
           readinessProbe:
             httpGet:
               path: /api/notification/health
@@ -57,30 +85,3 @@ spec:
               port: 3000
             initialDelaySeconds: 15
             periodSeconds: 20
-
-      affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app
-                    operator: In
-                    values:
-                      - rabbitmq
-              topologyKey: "kubernetes.io/hostname"
-
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app
-                    operator: In
-                    values:
-                      - notification-microservice
-              topologyKey: "kubernetes.io/hostname"
-
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
