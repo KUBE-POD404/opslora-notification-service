@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: opslora-test-ns
+  labels:
+    app: rabbitmq
+
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: rabbitmq
+
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+
+    spec:
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - notification-microservice
+                topologyKey: "kubernetes.io/hostname"
+
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+
+          envFrom:
+            - secretRef:
+                name: rabbitmq-secret
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+              ephemeral-storage: "500Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+              ephemeral-storage: "1Gi"
+
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+
+  volumeClaimTemplates:
+    - metadata:
+        name: rabbitmq-data
+      spec:
+        storageClassName: opslora-storageclass
+        accessModes:
+          - ReadWriteMany
+        resources:
+          requests:
+            storage: 5Gi
