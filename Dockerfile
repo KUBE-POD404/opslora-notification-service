@@ -26,9 +26,5 @@ COPY --chown=0:0 --chmod=0555 app/ ./app/
 USER 10001
  
  
-CMD ["celery", "-A", "app.core.celery_app", "worker",
-     "--loglevel=info",
-     "-Q", "notification_queue",
-     "-n", "notification@%h",
-     "--concurrency=2"]
+CMD ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "-Q", "notification_queue", "-n", "notification@%h", "--concurrency=2"]
  
