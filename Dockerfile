@@ -14,8 +14,8 @@ COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
 # ✅ ADD THIS (IMPORTANT)
-# RUN useradd -m appuser
-# USER appuser
+RUN useradd -m appuser
+USER appuser
 
 EXPOSE 3000
 
