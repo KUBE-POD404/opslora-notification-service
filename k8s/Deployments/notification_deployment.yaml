@@ -25,6 +25,7 @@ spec:
         app: notification-microservice
 
     spec:
+      automountServiceAccountToken: false
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
