@@ -1,0 +1,44 @@
+name: Reusable SonarQube Scan
+
+on:
+  workflow_call:
+    outputs:
+      quality_gate_status:
+        description: "SonarQube Quality Gate Status"
+        value: ${{ jobs.sonar.outputs.quality_gate_status }}
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+
+    outputs:
+      quality_gate_status: ${{ steps.qg.outputs.quality-gate-status }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v2
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Check Quality Gate
+        id: qg
+        uses: SonarSource/sonarqube-quality-gate-action@master
+        with:
+          pollingTimeoutSec: 300
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

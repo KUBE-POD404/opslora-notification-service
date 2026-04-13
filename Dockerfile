@@ -13,6 +13,10 @@ COPY app/ ./app/
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
+# ✅ ADD THIS (IMPORTANT)
+RUN useradd -m appuser
+USER appuser
+
 EXPOSE 3000
 
 CMD ["./entrypoint.sh"]

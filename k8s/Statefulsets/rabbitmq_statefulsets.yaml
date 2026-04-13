@@ -20,6 +20,7 @@ spec:
         app: rabbitmq
 
     spec:
+      automountServiceAccountToken: false
       affinity:
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

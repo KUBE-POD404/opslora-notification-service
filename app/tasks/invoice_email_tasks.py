@@ -5,10 +5,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 # -----------------------------
 # INVOICE CREATED
 # -----------------------------
+
 @shared_task(
     name="notification.send_invoice_created_email",
     bind=True,
@@ -52,7 +52,7 @@ Please complete payment before due date.
 
         logger.info("INVOICE_CREATED email sent", extra={"invoice_id": invoice_id})
 
-    except Exception as e:
+    except Exception:
         logger.error("INVOICE_CREATED failed", exc_info=True)
         raise
 
@@ -60,6 +60,7 @@ Please complete payment before due date.
 # -----------------------------
 # INVOICE PAID
 # -----------------------------
+
 @shared_task(
     name="notification.send_invoice_paid_email",
     bind=True,
@@ -78,6 +79,9 @@ def send_invoice_paid_email(self, payload, request_id=None):
         customer_name = payload.get("customer_name", "Customer")
         invoice_id = payload.get("invoice_id")
         total = payload.get("total")
+
+        if not email:
+            raise ValueError("Missing email")
 
         subject = f"Invoice #{invoice_id} Paid"
 
@@ -99,7 +103,7 @@ Thank you!
 
         logger.info("INVOICE_PAID email sent", extra={"invoice_id": invoice_id})
 
-    except Exception as e:
+    except Exception:
         logger.error("INVOICE_PAID failed", exc_info=True)
         raise
 
@@ -107,6 +111,7 @@ Thank you!
 # -----------------------------
 # INVOICE CANCELLED
 # -----------------------------
+
 @shared_task(
     name="notification.send_invoice_cancelled_email",
     bind=True,
@@ -125,6 +130,9 @@ def send_invoice_cancelled_email(self, payload, request_id=None):
         customer_name = payload.get("customer_name", "Customer")
         invoice_id = payload.get("invoice_id")
 
+        if not email:
+            raise ValueError("Missing email")
+
         subject = f"Invoice #{invoice_id} Cancelled"
 
         body = f"""
@@ -141,6 +149,6 @@ If this was unexpected, contact support.
 
         logger.info("INVOICE_CANCELLED email sent", extra={"invoice_id": invoice_id})
 
-    except Exception as e:
+    except Exception:
         logger.error("INVOICE_CANCELLED failed", exc_info=True)
         raise
