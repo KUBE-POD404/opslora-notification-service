@@ -43,7 +43,7 @@ jobs:
         id: snyk-check
         uses: snyk/actions/python@master
         with:
-          args: --file=requirements.txt --severity-threshold=high
+          args: --file=requirements.txt --severity-threshold=high --monitor --org=${{ secrets.SNYK_ORG }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
