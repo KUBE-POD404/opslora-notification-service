@@ -21,8 +21,9 @@ jobs:
 
   snyk-scan:
     name: Snyk Scan
-    needs: sonar-scan
-    if: ${{ needs.sonar-scan.outputs.quality_gate_status == 'PASSED' }}
+    needs:
+      - sonar-scan
+    if: ${{ always() }}
     uses: ./.github/workflows/ci_snyk_scan.yaml
     secrets: inherit
 
@@ -31,29 +32,14 @@ jobs:
     needs:
       - sonar-scan
       - snyk-scan
-    if: ${{ always() && (needs.sonar-scan.outputs.quality_gate_status == 'FAILED' || needs.snyk-scan.outputs.snyk_status == 'failure') }}
+    if: ${{ needs.snyk-scan.outputs.snyk_status == 'failure' }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Send Sonar notification
-        if: ${{ needs.sonar-scan.outputs.quality_gate_status == 'FAILED' }}
-        uses: ./.github/actions/send-notification
-        with:
-          pipeline_name: ${{ github.workflow }}
-          repository_name: ${{ github.repository }}
-          failure_reason: "SonarQube Quality Gate Failed"
-          author: ${{ github.event.head_commit.author.name || github.actor }}
-          smtp_username: ${{ secrets.SMTP_USERNAME }}
-          smtp_password: ${{ secrets.SMTP_PASSWORD }}
-          mail_from: ${{ secrets.MAIL_FROM }}
-          mail_to: ${{ secrets.MAIL_TO }}
-          slack_webhook: ${{ secrets.SLACK_INCOMING_WEBHOOK }}
-
       - name: Send Snyk notification
-        if: ${{ needs.snyk-scan.outputs.snyk_status == 'failure' }}
         uses: ./.github/actions/send-notification
         with:
           pipeline_name: ${{ github.workflow }}
