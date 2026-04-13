@@ -7,7 +7,8 @@ ENV PATH="/app/venv/bin:$PATH"
 RUN python -m venv /app/venv
  
 COPY requirements.txt .
- 
+
+# Install dependencies inside virtual environment using cached pip downloads 
 RUN --mount=type=cache,target=/root/.cache/pip \
     /app/venv/bin/pip install --no-cache-dir -r requirements.txt
  
