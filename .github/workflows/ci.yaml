@@ -53,7 +53,7 @@ jobs:
         with:
           pipeline_name: ${{ github.workflow }}
           repository_name: ${{ github.repository }}
-          failure_reason: ${{ needs.sonar-scan.outputs.quality_gate_status == 'FAILED' && needs.sonar-scan.outputs.notify_summary || needs.snyk-scan.outputs.notify_summary }}
+          failure_reason: ${{ needs.sonar-scan.outputs.quality_gate_status == 'FAILED' && (needs.sonar-scan.outputs.notify_summary || 'SonarQube Quality Gate Failed') || needs.snyk-scan.outputs.notify_summary || 'Snyk Scan Failed' }}
           author: ${{ github.actor }}
           smtp_username: ${{ secrets.SMTP_USERNAME }}
           smtp_password: ${{ secrets.SMTP_PASSWORD }}
