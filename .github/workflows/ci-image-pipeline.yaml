@@ -7,7 +7,7 @@ on:
       - main
 
 concurrency:
-  group: customer-merge-build-${{ github.event.pull_request.number }}
+  group: notification-merge-build-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 permissions:
