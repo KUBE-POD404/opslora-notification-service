@@ -25,7 +25,7 @@ jobs:
       - id: author
         run: |
           SHA="${{ github.event.pull_request.head.sha }}"
-          EMAIL=$(git show -s --format='%ae' "$SHA")
+          EMAIL=$(git show -s --format='%ae' "$SHA" || echo "")
           echo "email=$EMAIL" >> "$GITHUB_OUTPUT"
 
   sonar-scan:
@@ -40,14 +40,14 @@ jobs:
 
   notify:
     needs: [sonar-scan, snyk-scan, get-email]
-    if: ${{ always() && (needs.sonar-scan.outputs.quality_gate_status == 'FAILED' || needs.snyk-scan.outputs.snyk_status == 'failure') }}
+    if: ${{ always() && 
+      (needs.sonar-scan.outputs.quality_gate_status == 'FAILED' || 
+       needs.snyk-scan.outputs.snyk_status == 'failure') }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # SONAR NOTIFICATION
       - name: Sonar Notification
         if: ${{ needs.sonar-scan.outputs.quality_gate_status == 'FAILED' }}
         uses: ./.github/actions/send-notification
@@ -61,12 +61,9 @@ jobs:
           mail_from: ${{ secrets.MAIL_FROM }}
           mail_to: ${{ needs.get-email.outputs.email }}
           slack_webhook: ${{ secrets.SLACK_INCOMING_WEBHOOK }}
-          tool: sonar
           workflow_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          sonar_host_url: ${{ secrets.SONAR_HOST_URL }}
-          sonar_project_key: ${{ secrets.SONAR_PROJECT_KEY }}
+          report_url: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=${{ secrets.SONAR_PROJECT_KEY }}
 
-      # SNYK NOTIFICATION
       - name: Snyk Notification
         if: ${{ needs.snyk-scan.outputs.snyk_status == 'failure' }}
         uses: ./.github/actions/send-notification
@@ -80,7 +77,5 @@ jobs:
           mail_from: ${{ secrets.MAIL_FROM }}
           mail_to: ${{ needs.get-email.outputs.email }}
           slack_webhook: ${{ secrets.SLACK_INCOMING_WEBHOOK }}
-          tool: snyk
           workflow_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          snyk_org: ${{ secrets.SNYK_ORG }}
-          snyk_project_id: ${{ secrets.SNYK_PROJECT_ID }}
+          report_url: https://app.snyk.io/org/${{ secrets.SNYK_ORG }}/projects/${{ secrets.SNYK_PROJECT_ID }}
