@@ -1,14 +1,14 @@
 name: notification service Image workflow pipeline
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
-
-concurrency:
-  group: notification-merge-build-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  workflow_call:
+    outputs:
+      image_tag:
+        value: ${{ jobs.build.outputs.image_tag }}
+      failure_stage:
+        value: ${{ jobs.build.outputs.failure_stage }}
+      report_url:
+        value: ${{ jobs.build.outputs.report_url }}
 
 permissions:
   contents: read
@@ -17,92 +17,95 @@ permissions:
   packages: write
 
 jobs:
-  get-email:
+  build:
     runs-on: ubuntu-latest
+
     outputs:
-      email: ${{ steps.author.outputs.email }}
-      name: ${{ steps.author.outputs.name }}
+      image_tag: ${{ steps.meta.outputs.tag }}
+      failure_stage: ${{ steps.failure.outputs.stage }}
+      report_url: ${{ steps.report.outputs.url }}
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - id: author
+      - id: meta
         run: |
-          SHA="${{ github.event.pull_request.head.sha }}"
-          EMAIL=$(git show -s --format='%ae' "$SHA")
-          NAME=$(git show -s --format='%an' "$SHA")
-          echo "email=$EMAIL" >> "$GITHUB_OUTPUT"
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          TAG=${GITHUB_SHA::7}
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      should_build: ${{ steps.gate.outputs.should_build }}
-    steps:
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - id: gate
+      - id: report
         run: |
-          export GH_TOKEN=${{ github.token }}
+          echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
 
-          SHOULD_BUILD=false
+      - uses: docker/setup-buildx-action@v3
 
-          if [ "${{ github.event.pull_request.merged }}" != "true" ]; then
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if ! echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q '"build"'; then
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews > reviews.json
-
-          APPROVED=$(jq -r 'map(select(.state == "APPROVED")) | length > 0' reviews.json)
-
-          if [ "$APPROVED" = "true" ]; then
-            SHOULD_BUILD=true
-          fi
-
-          echo "should_build=$SHOULD_BUILD" >> "$GITHUB_OUTPUT"
-
-  docker-build:
-    needs: gate
-    if: ${{ needs.gate.outputs.should_build == 'true' }}
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
-      packages: write
-    uses: ./.github/workflows/ci-image-pipeline.yaml
-    secrets: inherit
-
-  notify:
-    name: Notification for image pipeline
-    runs-on: ubuntu-latest
-    needs:
-      - gate
-      - get-email
-      - docker-build
-    if: ${{ always() && needs.gate.outputs.should_build == 'true' && needs.docker-build.result == 'failure' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Send image pipeline notification
-        uses: ./.github/actions/notification-action
+      - uses: docker/login-action@v3
         with:
-          pipeline_name: ${{ github.workflow }}
-          repository_name: ${{ github.repository }}
-          failure_reason: ${{ needs.docker-build.outputs.failure_stage }}
-          author: ${{ needs.get-email.outputs.name || github.actor }}
-          smtp_username: ${{ secrets.SMTP_USERNAME }}
-          smtp_password: ${{ secrets.SMTP_PASSWORD }}
-          mail_from: ${{ secrets.MAIL_FROM }}
-          mail_to: ${{ needs.get-email.outputs.email || secrets.MAIL_TO }}
-          slack_webhook: ${{ secrets.SLACK_INCOMING_WEBHOOK }}
-          workflow_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          report_url: ${{ needs.docker-build.outputs.report_url }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: image
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/$OWNER/$REPO" >> $GITHUB_OUTPUT
+
+      - name: Build image
+        id: build
+        run: |
+          docker buildx build \
+            --load \
+            -t ${{ steps.image.outputs.image }}:${{ steps.meta.outputs.tag }} \
+            .
+
+      - name: Install Trivy
+        id: install_trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+          | sudo sh -s -- -b /usr/local/bin
+          trivy --version
+
+      - name: Scan the image with Trivy
+        id: scan
+        continue-on-error: true
+        run: |
+          trivy image \
+            --vuln-type library \
+            --severity HIGH,CRITICAL \
+            --format sarif \
+            --output trivy-report.sarif \
+            --exit-code 1 \
+            ${{ steps.image.outputs.image }}:${{ steps.meta.outputs.tag }}
+
+      - name: Upload SARIF to GitHub Security
+        if: ${{ steps.scan.outcome != 'skipped' && always() }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-report.sarif
+
+      - name: Stop on vulnerability
+        if: ${{ steps.scan.outcome == 'failure' }}
+        run: |
+          echo "Trivy scan failed. Blocking image push."
+          exit 1
+
+      - name: Push image
+        id: push
+        run: |
+          for i in 1 2 3; do
+            docker push ${{ steps.image.outputs.image }}:${{ steps.meta.outputs.tag }} && break || sleep 5
+          done
+
+      - id: failure
+        if: always()
+        run: |
+          if [ "${{ steps.build.outcome }}" = "failure" ]; then
+            echo "stage=build_failed" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.scan.outcome }}" = "failure" ]; then
+            echo "stage=trivy_scan_failed" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.push.outcome }}" = "failure" ]; then
+            echo "stage=push_failed" >> $GITHUB_OUTPUT
+          else
+            echo "stage=success" >> $GITHUB_OUTPUT
+          fi
