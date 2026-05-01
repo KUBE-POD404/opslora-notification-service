@@ -1,4 +1,4 @@
-name: Notification Service CI Pipeline
+name: Notification Pipeline
 
 on:
   pull_request:
@@ -29,13 +29,13 @@ jobs:
           echo "email=$EMAIL" >> "$GITHUB_OUTPUT"
 
   sonar-scan:
-    uses: ./.github/workflows/ci_sonar_scan.yaml
+    uses: ./.github/workflows/ci-sonar-check.yaml
     secrets: inherit
 
   snyk-scan:
     needs: sonar-scan
     if: ${{ needs.sonar-scan.outputs.quality_gate_status == 'PASSED' }}
-    uses: ./.github/workflows/ci_snyk_scan.yaml
+    uses: ./.github/workflows/ci-snyk-check.yaml
     secrets: inherit
 
   notify:
@@ -50,7 +50,7 @@ jobs:
 
       - name: Sonar Notification
         if: ${{ needs.sonar-scan.outputs.quality_gate_status == 'FAILED' }}
-        uses: ./.github/actions/send-notification
+        uses: ./.github/actions/notification-action
         with:
           pipeline_name: ${{ github.workflow }}
           repository_name: ${{ github.repository }}
@@ -66,7 +66,7 @@ jobs:
 
       - name: Snyk Notification
         if: ${{ needs.snyk-scan.outputs.snyk_status == 'failure' }}
-        uses: ./.github/actions/send-notification
+        uses: ./.github/actions/notification-action
         with:
           pipeline_name: ${{ github.workflow }}
           repository_name: ${{ github.repository }}
