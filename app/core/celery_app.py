@@ -1,11 +1,8 @@
 from celery import Celery
-import os
 import app.core.celery_signals
+from app.core.config import settings
 
-RABBITMQ_URL = os.getenv(
-    "RABBITMQ_URL",
-    "amqp://guest:guest@rabbitmq:5672//"
-)
+RABBITMQ_URL = settings.rabbitmq_url
 
 celery = Celery(
     "notification_service",
