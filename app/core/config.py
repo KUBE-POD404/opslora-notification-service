@@ -13,6 +13,13 @@ def _required(name: str) -> str:
     return value
 
 
+def _bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
     service_name: str = os.getenv("SERVICE_NAME", "notification-service")
@@ -21,8 +28,9 @@ class Settings:
     rabbitmq_url: str = _required("RABBITMQ_URL")
     smtp_host: str = _required("SMTP_HOST")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user: str = _required("SMTP_USER")
-    smtp_pass: str = _required("SMTP_PASS")
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_pass: str = os.getenv("SMTP_PASS", "")
+    smtp_starttls: bool = _bool("SMTP_STARTTLS", True)
     from_email: str = _required("FROM_EMAIL")
     from_name: str = os.getenv("FROM_NAME", "Opslora")
 
