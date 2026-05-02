@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.core.middleware import RequestContextMiddleware
+from app.routers.v1 import health
 
 setup_logging()
 
@@ -23,12 +24,8 @@ app = FastAPI(
 
 app.add_middleware(RequestContextMiddleware)
 
-
-@app.get("/api/v1/notification/health")
-def health():
-    return {"status": "ok"}
-
+app.include_router(health.router, prefix="/api/v1")
 
 @app.get("/api/notification/health", include_in_schema=False)
 def legacy_health():
-    return health()
+    return health.live()
