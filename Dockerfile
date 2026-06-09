@@ -1,4 +1,4 @@
-FROM dhi.io/python:3.13-dev AS builder
+FROM python:3.13-slim AS builder
  
 WORKDIR /app
  
@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     /app/venv/bin/pip install --no-cache-dir -r requirements.txt
  
-FROM dhi.io/python:3.13
+FROM python:3.13-slim
  
 WORKDIR /app
  
