@@ -1,25 +1,22 @@
 from celery import shared_task
 from app.services.email_service import send_email
+from app.services.email_templates import money, render_email
 from app.core.logging_config import request_id_ctx
 import logging
 
 logger = logging.getLogger(__name__)
 
-# -----------------------------
-# INVOICE CREATED
-# -----------------------------
 
 @shared_task(
     name="notification.send_invoice_created_email",
     bind=True,
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_kwargs={"max_retries": 5}
+    retry_kwargs={"max_retries": 5},
 )
 def send_invoice_created_email(self, payload, request_id=None):
 
     request_id_ctx.set(request_id or "N/A")
-
     logger.info("Processing INVOICE_CREATED event", extra={"payload": payload})
 
     try:
@@ -33,23 +30,22 @@ def send_invoice_created_email(self, payload, request_id=None):
             raise ValueError("Missing email")
 
         subject = f"Invoice #{invoice_id} Created"
+        body, html_body = render_email(
+            eyebrow="Invoice created",
+            title=f"Invoice #{invoice_id} is ready",
+            greeting_name=customer_name,
+            intro="Your invoice has been generated and is currently unpaid.",
+            details=[
+                ("Invoice", f"#{invoice_id}"),
+                ("Order", f"#{order_id}"),
+                ("Total", money(total)),
+                ("Status", "UNPAID"),
+            ],
+            text_extra="Please complete payment before the due date.",
+            html_extra='<p style="margin:18px 0 0;font-size:15px;line-height:1.6;color:#3f3f46;">Please complete payment before the due date.</p>',
+        )
 
-        body = f"""
-Hello {customer_name},
-
-Your invoice #{invoice_id} has been generated.
-
-🧾 Order ID: {order_id}
-💰 Total: ₹{total}
-📌 Status: UNPAID
-
-Please complete payment before due date.
-
-– Opslora Team
-"""
-
-        send_email(email, subject, body)
-
+        send_email(email, subject, body, html_body=html_body)
         logger.info("INVOICE_CREATED email sent", extra={"invoice_id": invoice_id})
 
     except Exception:
@@ -57,21 +53,16 @@ Please complete payment before due date.
         raise
 
 
-# -----------------------------
-# INVOICE PAID
-# -----------------------------
-
 @shared_task(
     name="notification.send_invoice_paid_email",
     bind=True,
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_kwargs={"max_retries": 5}
+    retry_kwargs={"max_retries": 5},
 )
 def send_invoice_paid_email(self, payload, request_id=None):
 
     request_id_ctx.set(request_id or "N/A")
-
     logger.info("Processing INVOICE_PAID event", extra={"payload": payload})
 
     try:
@@ -84,23 +75,21 @@ def send_invoice_paid_email(self, payload, request_id=None):
             raise ValueError("Missing email")
 
         subject = f"Invoice #{invoice_id} Paid"
+        body, html_body = render_email(
+            eyebrow="Payment received",
+            title=f"Invoice #{invoice_id} is paid",
+            greeting_name=customer_name,
+            intro="We have received the payment for this invoice.",
+            details=[
+                ("Invoice", f"#{invoice_id}"),
+                ("Amount", money(total)),
+                ("Status", "PAID"),
+            ],
+            text_extra="Thank you for your payment.",
+            html_extra='<p style="margin:18px 0 0;font-size:15px;line-height:1.6;color:#3f3f46;">Thank you for your payment.</p>',
+        )
 
-        body = f"""
-Hello {customer_name},
-
-🎉 Your payment has been received.
-
-Invoice #{invoice_id} is now PAID.
-
-💰 Amount: ₹{total}
-
-Thank you!
-
-– Opslora Team
-"""
-
-        send_email(email, subject, body)
-
+        send_email(email, subject, body, html_body=html_body)
         logger.info("INVOICE_PAID email sent", extra={"invoice_id": invoice_id})
 
     except Exception:
@@ -108,21 +97,16 @@ Thank you!
         raise
 
 
-# -----------------------------
-# INVOICE CANCELLED
-# -----------------------------
-
 @shared_task(
     name="notification.send_invoice_cancelled_email",
     bind=True,
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_kwargs={"max_retries": 5}
+    retry_kwargs={"max_retries": 5},
 )
 def send_invoice_cancelled_email(self, payload, request_id=None):
 
     request_id_ctx.set(request_id or "N/A")
-
     logger.info("Processing INVOICE_CANCELLED event", extra={"payload": payload})
 
     try:
@@ -134,19 +118,17 @@ def send_invoice_cancelled_email(self, payload, request_id=None):
             raise ValueError("Missing email")
 
         subject = f"Invoice #{invoice_id} Cancelled"
+        body, html_body = render_email(
+            eyebrow="Invoice cancelled",
+            title=f"Invoice #{invoice_id} was cancelled",
+            greeting_name=customer_name,
+            intro="This invoice has been cancelled.",
+            details=[("Invoice", f"#{invoice_id}"), ("Status", "CANCELLED")],
+            text_extra="If this was unexpected, please contact support.",
+            html_extra='<p style="margin:18px 0 0;font-size:15px;line-height:1.6;color:#3f3f46;">If this was unexpected, please contact support.</p>',
+        )
 
-        body = f"""
-Hello {customer_name},
-
-Your invoice #{invoice_id} has been cancelled.
-
-If this was unexpected, contact support.
-
-– Opslora Team
-"""
-
-        send_email(email, subject, body)
-
+        send_email(email, subject, body, html_body=html_body)
         logger.info("INVOICE_CANCELLED email sent", extra={"invoice_id": invoice_id})
 
     except Exception:
