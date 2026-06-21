@@ -1,44 +1,68 @@
-name: Reusable SonarQube Scan
+name: Reusable SonarCloud Scan
 
 on:
   workflow_call:
     outputs:
       quality_gate_status:
-        description: "SonarQube Quality Gate Status"
+        description: "SonarCloud Quality Gate Status"
         value: ${{ jobs.sonar.outputs.quality_gate_status }}
+      notify_summary:
+        description: "Notification summary"
+        value: ${{ jobs.sonar.outputs.notify_summary }}
 
 jobs:
   sonar:
     runs-on: ubuntu-latest
 
     outputs:
-      quality_gate_status: ${{ steps.qg.outputs.quality-gate-status }}
+      quality_gate_status: ${{ steps.set_outputs.outputs.quality_gate_status }}
+      notify_summary: ${{ steps.set_outputs.outputs.notify_summary }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Cache SonarQube packages
+      - name: Require SonarCloud token
+        run: |
+          if [ -z "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "SONAR_TOKEN repository secret is required for SonarCloud."
+            exit 1
+          fi
+
+      - name: Cache SonarCloud packages
         uses: actions/cache@v4
         with:
           path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
+          key: ${{ runner.os }}-sonarcloud
+          restore-keys: ${{ runner.os }}-sonarcloud
 
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v2
+      - name: SonarCloud scan and quality gate
+        id: sonar
+        uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'kube-pod404' }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || github.event.repository.name }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        continue-on-error: true
 
-      - name: Check Quality Gate
-        id: qg
-        uses: SonarSource/sonarqube-quality-gate-action@master
-        with:
-          pollingTimeoutSec: 300
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - name: Set outputs
+        id: set_outputs
+        if: always()
+        run: |
+          if [ "${{ steps.sonar.outcome }}" = "failure" ]; then
+            echo "quality_gate_status=FAILED" >> "$GITHUB_OUTPUT"
+            echo "notify_summary=SonarCloud scan or quality gate failed" >> "$GITHUB_OUTPUT"
+          else
+            echo "quality_gate_status=PASSED" >> "$GITHUB_OUTPUT"
+            echo "notify_summary=SonarCloud quality gate passed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fail if SonarCloud failed
+        if: ${{ steps.sonar.outcome == 'failure' }}
+        run: exit 1
