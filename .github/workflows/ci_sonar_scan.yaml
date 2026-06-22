@@ -61,9 +61,11 @@ jobs:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'kube-pod404' }}
             -Dsonar.projectKey=KUBE-POD404_opslora-notification-service
+            -Dsonar.branch.name=${{ github.head_ref || github.ref_name }}
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
         env:
+          GITHUB_EVENT_NAME: push
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         continue-on-error: true
 
