@@ -60,12 +60,10 @@ jobs:
         with:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'kube-pod404' }}
-            -Dsonar.projectKey=KUBE-POD404_opslora-notification-service
-            -Dsonar.branch.name=${{ github.head_ref || github.ref_name }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || github.event.repository.name }}
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
         env:
-          GITHUB_EVENT_NAME: push
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         continue-on-error: true
 
@@ -81,7 +79,6 @@ jobs:
             echo "notify_summary=SonarCloud quality gate passed" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: SonarCloud scanner did not complete
+      - name: Fail if SonarCloud failed
         if: ${{ steps.sonar.outcome == 'failure' }}
-        run: |
-          echo "SonarCloud scan did not complete; check notify_summary output for details."
+        run: exit 1
