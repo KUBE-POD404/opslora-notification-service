@@ -60,7 +60,7 @@ jobs:
         with:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'kube-pod404' }}
-            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || github.event.repository.name }}
+            -Dsonar.projectKey=KUBE-POD404_opslora-notification-service
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
         env:
